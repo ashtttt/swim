@@ -3,12 +3,29 @@ package swim
 import (
 	"log"
 	"net"
+	"strconv"
+	"time"
 )
 
 type Swim struct {
 	config    *Config
 	transport *Transport
-	logger    *log.Logger
+	Nodes     []Node
+
+	ticker *time.Ticker
+
+	targetIndex int
+	seqNo       int
+}
+
+type Node struct {
+	Name string
+	Addr string
+	Port int
+}
+
+func (n *Node) Address() string {
+	return net.JoinHostPort(n.Addr, strconv.Itoa(int(n.Port)))
 }
 
 func Init(config *Config) (*Swim, error) {
@@ -23,7 +40,6 @@ func Init(config *Config) (*Swim, error) {
 		tconfig := &TransportConfig{
 			BindAddr: config.BindAddr,
 			BindPort: config.BindPort,
-			logger:   swim.logger,
 		}
 		t, err := NewTransport(tconfig)
 		if err != nil {
@@ -58,4 +74,20 @@ func (s *Swim) processMessages(conn net.Conn) error {
 	}
 	conn.Write([]byte("Message received."))
 	return nil
+}
+
+func (s *Swim) nextTarget() *Node {
+	if len(s.Nodes) > 0 {
+		if s.targetIndex == 0 {
+			s.targetIndex = len(s.Nodes) - 1
+		} else {
+			s.targetIndex = s.targetIndex - 1
+		}
+		return &s.Nodes[s.targetIndex]
+	}
+	return nil
+}
+
+func (s *Swim) nextSeqNo() int {
+	return s.seqNo + 1
 }

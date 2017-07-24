@@ -8,7 +8,7 @@ import (
 type Config struct {
 	ProbingInterval time.Duration
 	SubGroupSize    int
-	AckTimeOut      time.Duration
+	ProbeTimeout    time.Duration
 
 	Name     string
 	BindAddr string
@@ -19,7 +19,7 @@ func (c *Config) DefaultConfig() *Config {
 	hostname, _ := os.Hostname()
 	config := &Config{
 		ProbingInterval: 1 * time.Second,
-		AckTimeOut:      500 * time.Millisecond,
+		ProbeTimeout:    500 * time.Millisecond,
 		Name:            hostname,
 		BindAddr:        "10.184.85.15",
 		BindPort:        1023,

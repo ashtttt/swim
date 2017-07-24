@@ -4,17 +4,16 @@ import (
 	"errors"
 	"log"
 	"net"
+	"time"
 )
 
 type TransportConfig struct {
 	BindAddr string
 	BindPort int
-	logger   *log.Logger
 }
 type Transport struct {
 	config *TransportConfig
 	tcpCh  chan net.Conn
-	logger *log.Logger
 }
 
 func NewTransport(config *TransportConfig) (*Transport, error) {
@@ -26,7 +25,6 @@ func NewTransport(config *TransportConfig) (*Transport, error) {
 	transport := &Transport{
 		config: config,
 		tcpCh:  make(chan net.Conn),
-		logger: config.logger,
 	}
 
 	ip := net.ParseIP(config.BindAddr)
@@ -37,14 +35,12 @@ func NewTransport(config *TransportConfig) (*Transport, error) {
 		log.Print(err)
 		return nil, err
 	}
-	log.Print("aftr listerner")
 	go transport.listen(listner)
 	return transport, nil
 
 }
 
 func (t *Transport) listen(listner *net.TCPListener) {
-	log.Print("listineting")
 	for {
 		con, err := listner.AcceptTCP()
 		if err != nil {
@@ -53,4 +49,14 @@ func (t *Transport) listen(listner *net.TCPListener) {
 		t.tcpCh <- con
 
 	}
+}
+
+func (s *Transport) getDailer(node *Node, timeout time.Duration) (net.Conn, error) {
+	dailer := net.Dialer{Timeout: timeout}
+	conn, err := dailer.Dial("tcp", node.Address())
+	if err != nil {
+		// TODO: Log Error
+		return conn, nil
+	}
+	return nil, err
 }
