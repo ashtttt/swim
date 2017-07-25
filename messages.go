@@ -4,6 +4,7 @@ type ping struct {
 	SeqNo int
 }
 
-type ack struct {
-	SeqNo int
+type ackMessage struct {
+	SeqNo  int
+	PayLod []*Node
 }
