@@ -2,8 +2,11 @@ package swim
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -16,6 +19,8 @@ type Swim struct {
 
 	targetIndex int
 	seqNo       int
+
+	locker sync.Mutex
 }
 
 type Node struct {
@@ -84,20 +89,42 @@ func (s *Swim) processRequests() {
 }
 
 func (s *Swim) processMessages(conn net.Conn) error {
+	conn.SetDeadline(time.Now().Add(s.config.ProbeTimeout))
 	defer conn.Close()
-	messageBytes, err := s.readMessage(conn)
+
+	msgType, msgBytes, err := s.readMessage(conn)
+
 	if err != nil {
+		fmt.Println(err)
 		return err
 	}
-	pingType, msgType := convertToObj(messageBytes)
-
 	if msgType == pingMsgType {
-		pingMsg := pingType.(ping)
-		ack := ackMessage{SeqNo: pingMsg.SeqNo, PayLod: s.nodes}
-		buff := converToBytes(&ack, ackMsgType)
-		_, err = s.sendMessage(buff, conn)
+		hb := new(ping)
+
+		deserialize(msgBytes, hb)
 		if err != nil {
+			fmt.Println(err)
 			return err
+		}
+		ack := ackMessage{SeqNo: hb.SeqNo, Name: hb.Name, PayLod: s.nodes}
+		buff := serialize(&ack, ackMsgType)
+
+		err = s.sendMessage(buff, conn)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+	}
+	if msgType == ackMsgType {
+		ack := new(ackMessage)
+		err := deserialize(msgBytes, ack)
+
+		if ack.SeqNo == s.seqNo {
+			//err := s.setAlive(&Node{Name: ack.Name, Addr: conn.})
+			err = s.handleAck(*ack)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -123,4 +150,30 @@ func (s *Swim) nextTarget() *Node {
 func (s *Swim) nextSeqNo() int {
 	s.seqNo = s.seqNo + 1
 	return s.seqNo
+}
+
+func (s *Swim) handleAck(ack ackMessage) error {
+
+	for _, remoteNode := range ack.PayLod {
+		status, i := s.isLocalNode(remoteNode)
+		if status {
+			s.nodes = append(s.nodes[:i], s.nodes[i+1:]...)
+			s.nodes = append(s.nodes, remoteNode)
+		} else {
+			s.nodes = append(s.nodes, remoteNode)
+		}
+	}
+	log.Print(s.nodes[0])
+	return nil
+}
+
+func (s *Swim) setAlive(node *Node) error {
+	staus, index := s.isLocalNode(node)
+	if staus {
+		localNode := s.nodes[index]
+		localNode.Status = node.Status
+	} else {
+		s.nodes = append(s.nodes, node)
+	}
+	return nil
 }

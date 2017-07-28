@@ -2,28 +2,26 @@ package swim
 
 import (
 	"bytes"
-	"encoding/binary"
+	"encoding/gob"
 )
 
-func converToBytes(obj interface{}, msgType uint8) []byte {
-	buff := new(bytes.Buffer)
-	buff.WriteByte(msgType)
-	binary.Write(buff, binary.BigEndian, &obj)
-	return buff.Bytes()
+func serialize(obj interface{}, msgType uint8) []byte {
+	buf := bytes.NewBuffer(nil)
+	buf.WriteByte(uint8(msgType))
+	encoder := gob.NewEncoder(buf)
+	encoder.Encode(obj)
+	return buf.Bytes()
+
 }
 
-func convertToObj(message []byte) (interface{}, uint8) {
-	var obj interface{}
-	var msgType uint8
-	buff := new(bytes.Buffer)
-	msgBuf := new(bytes.Buffer)
-
-	msgBuf.Write(message[:1])
-	buff.Write(message[1:])
-
-	binary.Read(buff, binary.BigEndian, &obj)
-	binary.Read(msgBuf, binary.BigEndian, msgType)
-	return &obj, msgType
+func deserialize(message []byte, obj interface{}) error {
+	buff := bytes.NewBuffer(message)
+	decoder := gob.NewDecoder(buff)
+	err := decoder.Decode(obj)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Swim) isLocalNode(node *Node) (bool, int) {

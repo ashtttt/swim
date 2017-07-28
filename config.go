@@ -19,10 +19,10 @@ func (c *Config) DefaultConfig() *Config {
 	hostname, _ := os.Hostname()
 	config := &Config{
 		ProbingInterval: 1 * time.Second,
-		ProbeTimeout:    500 * time.Millisecond,
+		ProbeTimeout:    3 * time.Second,
 		Name:            hostname,
-		BindAddr:        "10.184.85.15",
-		BindPort:        1023,
+		BindAddr:        "0.0.0.0",
+		BindPort:        8999,
 	}
 	return config
 

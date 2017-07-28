@@ -44,7 +44,7 @@ func NewTransport(config *TransportConfig) (*Transport, error) {
 func (t *Transport) listen(listner *net.TCPListener) {
 	log.Print("listening")
 	for {
-		con, err := listner.AcceptTCP()
+		con, err := listner.Accept()
 		if err != nil {
 			log.Print("error accepting TCP connection: %v", err)
 		}
@@ -53,9 +53,10 @@ func (t *Transport) listen(listner *net.TCPListener) {
 	}
 }
 
-func (s *Transport) getDailer(node *Node, timeout time.Duration) (net.Conn, error) {
+func (s *Transport) getDailer(node net.Addr, timeout time.Duration) (net.Conn, error) {
 	dailer := net.Dialer{Timeout: timeout}
-	conn, err := dailer.Dial("tcp", node.Address())
+	conn, err := dailer.Dial("tcp", node.String())
+
 	if err != nil {
 		// TODO: Log Error
 		return nil, err
