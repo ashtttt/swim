@@ -2,8 +2,6 @@ package swim
 
 import (
 	"errors"
-	"fmt"
-	"log"
 	"net"
 	"strconv"
 	"sync"
@@ -57,6 +55,7 @@ func Init(config *Config) (*Swim, error) {
 	return swim, nil
 }
 
+// Join
 func (s *Swim) Join(knownHosts []string) error {
 	if len(knownHosts) <= 0 {
 		return errors.New("Atleast one known host is required")
@@ -95,39 +94,19 @@ func (s *Swim) processMessages(conn net.Conn) error {
 	msgType, msgBytes, err := s.readMessage(conn)
 
 	if err != nil {
-		fmt.Println(err)
+		// TODO: Log error
 		return err
 	}
-	if msgType == pingMsgType {
-		hb := new(ping)
-
-		deserialize(msgBytes, hb)
+	switch msgType {
+	case pingMsgType:
+		err := s.processPing(conn, msgBytes)
 		if err != nil {
-			fmt.Println(err)
+			//TODO: log error
 			return err
 		}
-		ack := ackMessage{SeqNo: hb.SeqNo, Name: hb.Name, PayLod: s.nodes}
-		buff := serialize(&ack, ackMsgType)
-
-		err = s.sendMessage(buff, conn)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
+	case ackMsgType:
+		// TODO: handle ack
 	}
-	if msgType == ackMsgType {
-		ack := new(ackMessage)
-		err := deserialize(msgBytes, ack)
-
-		if ack.SeqNo == s.seqNo {
-			//err := s.setAlive(&Node{Name: ack.Name, Addr: conn.})
-			err = s.handleAck(*ack)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -152,28 +131,21 @@ func (s *Swim) nextSeqNo() int {
 	return s.seqNo
 }
 
-func (s *Swim) handleAck(ack ackMessage) error {
+func (s *Swim) processPing(conn net.Conn, msg []byte) error {
+	hb := new(ping)
 
-	for _, remoteNode := range ack.PayLod {
-		status, i := s.isLocalNode(remoteNode)
-		if status {
-			s.nodes = append(s.nodes[:i], s.nodes[i+1:]...)
-			s.nodes = append(s.nodes, remoteNode)
-		} else {
-			s.nodes = append(s.nodes, remoteNode)
-		}
+	err := deserialize(msg, hb)
+	if err != nil {
+		// TODO: Log Error
+		return err
 	}
-	log.Print(s.nodes[0])
-	return nil
-}
+	ack := ackMessage{SeqNo: hb.SeqNo, Name: hb.Name, PayLod: s.nodes}
+	buff := serialize(&ack, ackMsgType)
 
-func (s *Swim) setAlive(node *Node) error {
-	staus, index := s.isLocalNode(node)
-	if staus {
-		localNode := s.nodes[index]
-		localNode.Status = node.Status
-	} else {
-		s.nodes = append(s.nodes, node)
+	err = s.sendMessage(buff, conn)
+	if err != nil {
+		// TODO: log error
+		return err
 	}
 	return nil
 }

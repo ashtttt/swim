@@ -44,7 +44,7 @@ func NewTransport(config *TransportConfig) (*Transport, error) {
 func (t *Transport) listen(listner *net.TCPListener) {
 	log.Print("listening")
 	for {
-		con, err := listner.Accept()
+		con, err := listner.AcceptTCP()
 		if err != nil {
 			log.Print("error accepting TCP connection: %v", err)
 		}

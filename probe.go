@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"time"
 )
@@ -38,6 +39,7 @@ func (s *Swim) probe(node *Node) error {
 	addr, _ := net.ResolveTCPAddr("tcp", node.Address())
 	conn, err := s.transport.getDailer(addr, s.config.ProbeTimeout)
 	if err != nil {
+		//TODO: may be node is down -  try to se
 		return err
 	}
 
@@ -52,8 +54,11 @@ func (s *Swim) probe(node *Node) error {
 	if msgType == ackMsgType {
 		ack := new(ackMessage)
 		err = deserialize(msgBytes, ack)
+		if err != nil {
+			//TODO: Log errors
+			return err
+		}
 		if ack.SeqNo == hb.SeqNo {
-
 			ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 			err := s.setAlive(
 				&Node{
@@ -64,6 +69,7 @@ func (s *Swim) probe(node *Node) error {
 				})
 			err = s.handleAck(*ack)
 			if err != nil {
+				//TODO :  Log errors
 				return err
 			}
 		}
@@ -107,4 +113,30 @@ func (s *Swim) readMessage(conn net.Conn) (uint8, []byte, error) {
 	message := data.Bytes()[4:]
 	msgType := uint8(message[0])
 	return msgType, message[1:], nil
+}
+
+func (s *Swim) handleAck(ack ackMessage) error {
+
+	for _, remoteNode := range ack.PayLod {
+		status, i := s.isLocalNode(remoteNode)
+		if status {
+			s.nodes = append(s.nodes[:i], s.nodes[i+1:]...)
+			s.nodes = append(s.nodes, remoteNode)
+		} else {
+			s.nodes = append(s.nodes, remoteNode)
+		}
+	}
+	log.Print(s.nodes[0])
+	return nil
+}
+
+func (s *Swim) setAlive(node *Node) error {
+	staus, index := s.isLocalNode(node)
+	if staus {
+		localNode := s.nodes[index]
+		localNode.Status = node.Status
+	} else {
+		s.nodes = append(s.nodes, node)
+	}
+	return nil
 }
